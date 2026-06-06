@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "registrations": [
+    {
+      "label": "poseidon",
+      "tld": "tact",
+      "ownerEth": "0x0000000000000000000000000000000000000001",
+      "records": {
+        "eth": "0x0000000000000000000000000000000000000001",
+        "text:description": "Poseidon Finance registry root"
+      },
+      "registeredAt": 1749200000000,
+      "expiresAt": 2084563200000
+    }
+  ]
+}

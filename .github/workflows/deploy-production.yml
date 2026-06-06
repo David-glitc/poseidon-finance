@@ -1,0 +1,87 @@
+# Build on GitHub Actions → push to GHCR → Coolify pulls image (no VPS build).
+# Branch: main → your Coolify personal project
+
+name: Deploy production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: poseidon-finance-production
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/david-glitc/poseidon-finance
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Write production build env
+        env:
+          NEXT_PUBLIC_APP_URL: ${{ secrets.NEXT_PUBLIC_APP_URL }}
+          NEXT_PUBLIC_TACIT_WORKER_URL: ${{ secrets.NEXT_PUBLIC_TACIT_WORKER_URL }}
+          REGISTRY_TREASURY_ADDRESS: ${{ secrets.REGISTRY_TREASURY_ADDRESS }}
+        run: node scripts/ci-build-env.mjs
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:main
+            ${{ env.IMAGE }}:production
+            ${{ env.IMAGE }}:sha-${{ github.sha }}
+          cache-from: type=gha,scope=poseidon-production
+          cache-to: type=gha,mode=max,scope=poseidon-production
+
+      - name: Trigger Coolify redeploy
+        env:
+          COOLIFY_DEPLOY_WEBHOOK: ${{ secrets.COOLIFY_DEPLOY_WEBHOOK }}
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+        run: |
+          if [ -z "${COOLIFY_DEPLOY_WEBHOOK:-}" ]; then
+            echo "COOLIFY_DEPLOY_WEBHOOK not set — skip redeploy (image still pushed to GHCR)"
+            exit 0
+          fi
+          if [ -z "${COOLIFY_TOKEN:-}" ]; then
+            echo "COOLIFY_TOKEN not set — skip redeploy (image still pushed to GHCR)"
+            exit 0
+          fi
+          http_code="$(curl -sS -o /tmp/coolify-redeploy.json -w "%{http_code}" -X GET "$COOLIFY_DEPLOY_WEBHOOK" \
+            -H "Authorization: Bearer ${COOLIFY_TOKEN}")"
+          echo "Coolify redeploy HTTP ${http_code}"
+          cat /tmp/coolify-redeploy.json || true
+          if [ "$http_code" -lt 200 ] || [ "$http_code" -ge 300 ]; then
+            echo "::error::Coolify redeploy failed (HTTP ${http_code}). Refresh COOLIFY_TOKEN and COOLIFY_DEPLOY_WEBHOOK in the production environment."
+            exit 1
+          fi

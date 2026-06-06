@@ -2,28 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { useBtcWallet, useEthWallet } from "@/lib/wallet/provider";
+import { useNetworks } from "@/lib/network/context";
 import {
   TACIT_DAPP_URL,
   clearTacitLink,
   getTacitWalletMeta,
   markTacitLinked,
-  type TacitNetwork,
 } from "@/lib/tacit/wallet-store";
-import { GlassCard } from "./GlassCard";
+import { Panel } from "./Panel";
 
 export function WalletHub() {
   const { address, isConnected, connect, connectors, disconnect } = useEthWallet();
-  const { btcAddress, disconnectBtc } = useBtcWallet();
+  const { btcAddress, connectBtc, disconnectBtc } = useBtcWallet();
+  const { tact, eth, btc } = useNetworks();
   const [tacitMeta, setTacitMeta] = useState<ReturnType<typeof getTacitWalletMeta>>(null);
-  const [network, setNetwork] = useState<TacitNetwork>("mainnet");
   const [btcBusy, setBtcBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    setTacitMeta(getTacitWalletMeta(network));
-  }, [network]);
-
-  const { connectBtc } = useBtcWallet();
+    setTacitMeta(getTacitWalletMeta(tact));
+  }, [tact]);
 
   async function connectSats() {
     setBtcBusy(true);
@@ -38,73 +36,55 @@ export function WalletHub() {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <GlassCard className="p-6">
-        <h3 className="text-sm uppercase tracking-wider text-sky-400/70">Ethereum</h3>
-        <p className="mt-2 text-xs text-sky-200/45">Name payments · .wei · .eth bridge</p>
+    <div className="grid gap-4 lg:grid-cols-3">
+      <Panel title={`Ethereum · ${eth}`}>
         {isConnected && address ? (
           <>
-            <p className="mt-4 break-all font-mono text-sm text-sky-100">{address}</p>
-            <button type="button" className="btn-ghost mt-4 w-full" onClick={() => disconnect()}>
+            <p className="break-all font-[family-name:var(--font-mono)] text-xs">{address}</p>
+            <button type="button" className="btn-outline mt-4 w-full" onClick={() => disconnect()}>
               Disconnect
             </button>
           </>
         ) : (
           <button
             type="button"
-            className="btn-primary mt-4 w-full"
+            className="btn-primary w-full"
             onClick={() => connect({ connector: connectors[0] })}
           >
             Connect ETH
           </button>
         )}
-      </GlassCard>
+      </Panel>
 
-      <GlassCard className="p-6">
-        <h3 className="text-sm uppercase tracking-wider text-sky-400/70">Bitcoin</h3>
-        <p className="mt-2 text-xs text-sky-200/45">sats-connect · Xverse / Leather / OKX</p>
+      <Panel title={`Bitcoin · ${btc}`}>
+        <p className="mb-3 text-xs text-[var(--pf-muted)]">sats-connect — pick wallet in browser extension</p>
         {btcAddress ? (
           <>
-            <p className="mt-4 break-all font-mono text-sm text-sky-100">{btcAddress}</p>
-            <button type="button" className="btn-ghost mt-4 w-full" onClick={disconnectBtc}>
+            <p className="break-all font-[family-name:var(--font-mono)] text-xs">{btcAddress}</p>
+            <button type="button" className="btn-outline mt-4 w-full" onClick={disconnectBtc}>
               Disconnect
             </button>
           </>
         ) : (
-          <button
-            type="button"
-            className="btn-primary mt-4 w-full"
-            onClick={connectSats}
-            disabled={btcBusy}
-          >
-            {btcBusy ? "Connecting…" : "Connect BTC (sats-connect)"}
+          <button type="button" className="btn-primary w-full" onClick={connectSats} disabled={btcBusy}>
+            {btcBusy ? "Connecting…" : "Connect BTC"}
           </button>
         )}
-      </GlassCard>
+      </Panel>
 
-      <GlassCard className="p-6">
-        <h3 className="text-sm uppercase tracking-wider text-sky-400/70">Tacit wallet</h3>
-        <p className="mt-2 text-xs text-sky-200/45">Confidential balances · AMM · mixer</p>
-        <select
-          className="input-glass mt-4"
-          value={network}
-          onChange={(e) => setNetwork(e.target.value as TacitNetwork)}
-        >
-          <option value="mainnet">Mainnet</option>
-          <option value="signet">Signet</option>
-        </select>
+      <Panel title={`Tacit · ${tact}`}>
         {tacitMeta?.hasKey ? (
           <>
-            <p className="mt-4 text-sm text-emerald-300">Linked to {network}</p>
+            <p className="text-sm">Linked to {tact}</p>
             <button
               type="button"
-              className="btn-ghost mt-4 w-full"
+              className="btn-outline mt-4 w-full"
               onClick={() => {
-                clearTacitLink(network);
+                clearTacitLink(tact);
                 setTacitMeta(null);
               }}
             >
-              Clear link flag
+              Clear link
             </button>
           </>
         ) : (
@@ -112,14 +92,14 @@ export function WalletHub() {
             href={TACIT_DAPP_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-primary mt-4 block text-center"
-            onClick={() => markTacitLinked(network)}
+            className="btn-primary block text-center"
+            onClick={() => markTacitLinked(tact)}
           >
-            Open Tacit · create / import key
+            Open Tacit wallet
           </a>
         )}
-      </GlassCard>
-      {err && <p className="text-sm text-rose-300 lg:col-span-3">{err}</p>}
+      </Panel>
+      {err && <p className="text-sm text-red-400 lg:col-span-3">{err}</p>}
     </div>
   );
 }

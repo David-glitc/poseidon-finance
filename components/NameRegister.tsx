@@ -3,16 +3,13 @@
 import { useEffect, useState } from "react";
 import { useBtcWallet, useEthWallet } from "@/lib/wallet/provider";
 import { isValidLabel, normalizeLabel } from "@/lib/tact-names/normalize";
-import type { NameTld } from "@/lib/names/tlds";
-import { TLDS } from "@/lib/names/tlds";
 import type { PriceQuote } from "@/lib/names/pricing";
-import { GlassCard } from "./GlassCard";
+import { Panel } from "./Panel";
 
 export function NameRegister() {
   const { address } = useEthWallet();
   const { btcAddress } = useBtcWallet();
   const [label, setLabel] = useState("");
-  const [tld, setTld] = useState<NameTld>("tact");
   const [tacitShielded, setTacitShielded] = useState("");
   const [quote, setQuote] = useState<PriceQuote | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -24,24 +21,24 @@ export function NameRegister() {
       setQuote(null);
       return;
     }
-    fetch(`/api/names/price?label=${norm}&tld=${tld}`)
+    fetch(`/api/names/price?label=${norm}&tld=tact`)
       .then((r) => r.json())
       .then(setQuote)
       .catch(() => setQuote(null));
-  }, [label, tld]);
+  }, [label]);
 
-  async function bookAndRegister() {
+  async function register() {
     const norm = normalizeLabel(label);
     if (!isValidLabel(norm)) {
-      setMsg("Invalid label");
+      setMsg("Use 1–62 lowercase letters and numbers.");
       return;
     }
     if (!address) {
-      setMsg("Connect ETH wallet to register");
+      setMsg("Connect an Ethereum wallet first.");
       return;
     }
     if (!quote) {
-      setMsg("Price unavailable");
+      setMsg("Price unavailable.");
       return;
     }
 
@@ -53,10 +50,10 @@ export function NameRegister() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           label: norm,
-          tld,
+          tld: "tact",
           ownerEth: address,
           ownerBtc: btcAddress,
-          sig: `book:${norm}.${tld}:${address}:${Date.now()}`,
+          sig: `book:${norm}.tact:${address}:${Date.now()}`,
           priceUsd: quote.usd,
         }),
       });
@@ -70,11 +67,10 @@ export function NameRegister() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           label: norm,
-          tld,
+          tld: "tact",
           ownerEth: address,
           ownerBtc: btcAddress,
           priceUsd: quote.usd,
-          paymentRef: `poseidon-${norm}-${Date.now()}`,
           records: {
             eth: address,
             btc: btcAddress ?? undefined,
@@ -86,7 +82,7 @@ export function NameRegister() {
         const err = await regRes.json();
         throw new Error(err.error ?? "register failed");
       }
-      setMsg(`Registered ${norm}.${tld} — $${quote.usd} recorded`);
+      setMsg(`Registered ${norm}.tact — $${quote.usd}`);
       setLabel("");
     } catch (e) {
       setMsg(e instanceof Error ? e.message : "failed");
@@ -95,60 +91,41 @@ export function NameRegister() {
     }
   }
 
-  const poseidonTld = tld === "tact" || tld === "btc";
-
   return (
-    <GlassCard strong className="space-y-4 p-6 md:p-8">
-      <h2 className="font-display text-xl font-semibold text-sky-100">Register</h2>
+    <Panel title="Register .tact">
+      <p className="mb-4 text-sm text-[var(--pf-muted)]">
+        Poseidon hosts <strong className="text-[var(--pf-text)]">.tact</strong> only.{" "}
+        <span className="text-[var(--pf-muted)]">.eth</span> and{" "}
+        <span className="text-[var(--pf-muted)]">.wei</span> are resolve-only for sending on EVM.
+      </p>
       <div className="flex gap-2">
         <input
           value={label}
           onChange={(e) => setLabel(e.target.value)}
           placeholder="yourname"
-          className="input-glass flex-1"
+          className="input flex-1"
         />
-        <select
-          className="input-glass w-28"
-          value={tld}
-          onChange={(e) => setTld(e.target.value as NameTld)}
-        >
-          {Object.values(TLDS).map((t) => (
-            <option key={t.tld} value={t.tld}>
-              {t.label}
-            </option>
-          ))}
-        </select>
+        <span className="flex items-center border border-[var(--pf-border)] bg-[var(--pf-bg)] px-3 text-sm text-[var(--pf-muted)]">
+          .tact
+        </span>
       </div>
       {quote && (
-        <div className="rounded-2xl border border-sky-400/20 bg-black/25 px-4 py-3 text-sm">
-          <span className="text-sky-200/60">Price </span>
-          <span className="font-semibold text-sky-100">${quote.usd}</span>
-          <span className="ml-2 text-xs uppercase text-sky-400/50">{quote.tier}</span>
-          <p className="mt-1 text-xs text-sky-400/40">Max $20 · economy from $2 · vanity fixed set</p>
+        <div className="mt-3 border border-[var(--pf-border)] px-3 py-2 text-sm">
+          <span className="text-[var(--pf-muted)]">Price </span>
+          <span className="font-medium">${quote.usd}</span>
+          <span className="ml-2 text-xs uppercase text-[var(--pf-muted)]">{quote.tier}</span>
         </div>
       )}
-      {poseidonTld && (
-        <input
-          value={tacitShielded}
-          onChange={(e) => setTacitShielded(e.target.value)}
-          placeholder="tcs1… shielded address (optional)"
-          className="input-glass text-sm"
-        />
-      )}
-      {!poseidonTld && (
-        <p className="text-xs text-sky-400/45">
-          {tld}.wei and .eth resolve via chain contracts — register on wei.domains or ENS.
-        </p>
-      )}
-      <button
-        type="button"
-        onClick={bookAndRegister}
-        disabled={busy || !poseidonTld}
-        className="btn-primary w-full disabled:opacity-40"
-      >
-        {busy ? "Registering…" : poseidonTld ? `Register ${label || "…"}.${tld}` : "Poseidon hosts .tact / .btc only"}
+      <input
+        value={tacitShielded}
+        onChange={(e) => setTacitShielded(e.target.value)}
+        placeholder="tcs1… shielded address (optional)"
+        className="input mt-3 text-sm"
+      />
+      <button type="button" onClick={register} disabled={busy} className="btn-primary mt-4 w-full">
+        {busy ? "Registering…" : `Register ${label || "name"}.tact`}
       </button>
-      {msg && <p className="text-sm text-sky-200/60">{msg}</p>}
-    </GlassCard>
+      {msg && <p className="mt-3 text-sm text-[var(--pf-muted)]">{msg}</p>}
+    </Panel>
   );
 }

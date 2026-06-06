@@ -9,11 +9,20 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { createConfig, http, WagmiProvider, useAccount, useConnect, useDisconnect } from "wagmi";
+import {
+  createConfig,
+  http,
+  WagmiProvider,
+  useAccount,
+  useConnect,
+  useDisconnect,
+  useSwitchChain,
+} from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
 import { injected } from "wagmi/connectors";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { connectBtcWallet } from "@/lib/tacit/sats-connect";
+import { NetworkProvider, useNetworks } from "@/lib/network/context";
 
 interface WalletContextValue {
   btcAddress: string | null;
@@ -36,24 +45,24 @@ const queryClient = new QueryClient();
 
 function BtcWalletBridge({ children }: { children: ReactNode }) {
   const [btcAddress, setBtcAddress] = useState<string | null>(null);
+  const { btc } = useNetworks();
 
   useEffect(() => {
     const saved = localStorage.getItem("poseidon-btc");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as { address: string };
-        setBtcAddress(parsed.address);
-      } catch {
-        localStorage.removeItem("poseidon-btc");
-      }
+    if (!saved) return;
+    try {
+      const parsed = JSON.parse(saved) as { address: string };
+      setBtcAddress(parsed.address);
+    } catch {
+      localStorage.removeItem("poseidon-btc");
     }
   }, []);
 
   const connectBtc = useCallback(async () => {
-    const { address } = await connectBtcWallet();
+    const { address } = await connectBtcWallet(btc);
     setBtcAddress(address);
-    localStorage.setItem("poseidon-btc", JSON.stringify({ address }));
-  }, []);
+    localStorage.setItem("poseidon-btc", JSON.stringify({ address, network: btc }));
+  }, [btc]);
 
   const disconnectBtc = useCallback(() => {
     setBtcAddress(null);
@@ -65,9 +74,20 @@ function BtcWalletBridge({ children }: { children: ReactNode }) {
     [btcAddress, connectBtc, disconnectBtc],
   );
 
-  return (
-    <WalletContext.Provider value={value}>{children}</WalletContext.Provider>
-  );
+  return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
+}
+
+function EthChainSync({ children }: { children: ReactNode }) {
+  const { eth } = useNetworks();
+  const { isConnected } = useAccount();
+  const { switchChain } = useSwitchChain();
+
+  useEffect(() => {
+    if (!isConnected) return;
+    switchChain({ chainId: eth === "sepolia" ? sepolia.id : mainnet.id });
+  }, [eth, isConnected, switchChain]);
+
+  return <>{children}</>;
 }
 
 export function useBtcWallet() {
@@ -79,16 +99,20 @@ export function useBtcWallet() {
 export function WalletProvider({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <WagmiProvider config={wagmiConfig}>
-        <BtcWalletBridge>{children}</BtcWalletBridge>
-      </WagmiProvider>
+      <NetworkProvider>
+        <WagmiProvider config={wagmiConfig}>
+          <EthChainSync>
+            <BtcWalletBridge>{children}</BtcWalletBridge>
+          </EthChainSync>
+        </WagmiProvider>
+      </NetworkProvider>
     </QueryClientProvider>
   );
 }
 
 export function useEthWallet() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, chainId } = useAccount();
   const { connect, connectors, isPending } = useConnect();
   const { disconnect } = useDisconnect();
-  return { address, isConnected, connect, connectors, isPending, disconnect };
+  return { address, isConnected, chainId, connect, connectors, isPending, disconnect };
 }

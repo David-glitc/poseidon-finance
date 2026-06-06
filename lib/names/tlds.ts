@@ -6,38 +6,45 @@ export interface TldMeta {
   chain: string;
   description: string;
   managedBy: "poseidon" | "ens" | "wei";
+  registerable: boolean;
 }
 
 export const TLDS: Record<NameTld, TldMeta> = {
   tact: {
     tld: "tact",
     label: ".tact",
-    chain: "Bitcoin / Tacit",
-    description: "Poseidon registry — shielded Tacit addresses",
+    chain: "Tacit / Bitcoin",
+    description: "Poseidon registry — register here",
     managedBy: "poseidon",
+    registerable: true,
   },
   wei: {
     tld: "wei",
     label: ".wei",
     chain: "Ethereum",
-    description: "Wei Name Service",
+    description: "Resolve only — register at wei.domains",
     managedBy: "wei",
+    registerable: false,
   },
   eth: {
     tld: "eth",
     label: ".eth",
-    chain: "Ethereum",
-    description: "ENS",
+    chain: "Ethereum / EVM",
+    description: "Resolve only — register via ENS",
     managedBy: "ens",
+    registerable: false,
   },
   btc: {
     tld: "btc",
     label: ".btc",
     chain: "Bitcoin",
-    description: "Poseidon BTC payment handles",
+    description: "Resolve only — payment handle lookup",
     managedBy: "poseidon",
+    registerable: false,
   },
 };
+
+export const RESOLVE_TLDS = Object.values(TLDS);
 
 export function parseQualifiedName(raw: string): { label: string; tld: NameTld } | null {
   const s = raw.trim().toLowerCase().replace(/\s+/g, "");

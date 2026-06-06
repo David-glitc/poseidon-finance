@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 import {
   getRegistration,
   isBooked,
@@ -13,7 +15,10 @@ const REGISTRY_TTL_MS = 365 * 24 * 60 * 60 * 1000;
 export async function POST(req: Request) {
   const body = await req.json();
   const label = normalizeLabel(body.label ?? "");
-  const tld = (body.tld === "btc" ? "btc" : "tact") as "tact" | "btc";
+  const tld = "tact" as const;
+  if (body.tld && body.tld !== "tact") {
+    return NextResponse.json({ error: "only .tact registration supported" }, { status: 400 });
+  }
   const ownerEth = String(body.ownerEth ?? "").toLowerCase();
   const ownerBtc = body.ownerBtc ? String(body.ownerBtc) : undefined;
   const records = (body.records ?? {}) as TactRecords;

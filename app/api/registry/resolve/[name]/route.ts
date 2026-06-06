@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 import { isValidLabel, normalizeLabel } from "@/lib/tact-names/normalize";
 import { resolveWithProof, loadSnapshotBundle } from "@/lib/tact-names/store";
 

@@ -1,17 +1,20 @@
 import { createPublicClient, http, namehash } from "viem";
 import { normalize } from "viem/ens";
-import { mainnet } from "viem/chains";
+import { mainnet, sepolia } from "viem/chains";
 import type { NameTld } from "./tlds";
 import { getRegistration, resolveWithProof, loadSnapshotBundle } from "@/lib/tact-names/store";
 import { verifyRegistration } from "@/lib/tact-names/verify";
 import { isValidLabel, normalizeLabel } from "@/lib/tact-names/normalize";
+import type { EthNetwork } from "@/lib/network/context";
 
 const WEI_NFT = "0x0000000000696760e15f265e828db644a0c242eb" as const;
 
-const ethClient = createPublicClient({
-  chain: mainnet,
-  transport: http("https://cloudflare-eth.com"),
-});
+function ethClient(network: EthNetwork) {
+  return createPublicClient({
+    chain: network === "sepolia" ? sepolia : mainnet,
+    transport: http(),
+  });
+}
 
 export interface ResolvedRecords {
   eth?: string;
@@ -30,12 +33,23 @@ export interface MultiResolveResult {
   records: ResolvedRecords;
 }
 
-async function resolveWei(label: string): Promise<MultiResolveResult> {
+async function resolveWei(label: string, ethNetwork: EthNetwork): Promise<MultiResolveResult> {
   const qualified = `${label}.wei`;
+  if (ethNetwork !== "mainnet") {
+    return {
+      qualified,
+      tld: "wei",
+      found: false,
+      verified: true,
+      source: "wei-names-mainnet-only",
+      records: {},
+    };
+  }
   try {
+    const client = ethClient(ethNetwork);
     const node = namehash(normalize(qualified));
     const tokenId = BigInt(node);
-    await ethClient.readContract({
+    await client.readContract({
       address: WEI_NFT,
       abi: [
         {
@@ -50,7 +64,7 @@ async function resolveWei(label: string): Promise<MultiResolveResult> {
       args: [tokenId],
     });
 
-    let addr = (await ethClient.readContract({
+    const addr = (await client.readContract({
       address: WEI_NFT,
       abi: [
         {
@@ -67,143 +81,72 @@ async function resolveWei(label: string): Promise<MultiResolveResult> {
 
     const zero = "0x0000000000000000000000000000000000000000";
     if (!addr || addr === zero) {
-      return {
-        qualified,
-        tld: "wei",
-        found: false,
-        verified: true,
-        source: "wei-names-mainnet",
-        records: {},
-      };
+      return { qualified, tld: "wei", found: false, verified: true, source: "wei-names", records: {} };
     }
-
-    return {
-      qualified,
-      tld: "wei",
-      found: true,
-      verified: true,
-      source: "wei-names-mainnet",
-      records: { eth: addr },
-    };
+    return { qualified, tld: "wei", found: true, verified: true, source: "wei-names", records: { eth: addr } };
   } catch {
-    return {
-      qualified,
-      tld: "wei",
-      found: false,
-      verified: true,
-      source: "wei-names-mainnet",
-      records: {},
-    };
+    return { qualified, tld: "wei", found: false, verified: true, source: "wei-names", records: {} };
   }
 }
 
-async function resolveEns(label: string): Promise<MultiResolveResult> {
+async function resolveEns(label: string, ethNetwork: EthNetwork): Promise<MultiResolveResult> {
   const qualified = `${label}.eth`;
   try {
-    const addr = await ethClient.getEnsAddress({ name: qualified });
+    const client = ethClient(ethNetwork);
+    const addr = await client.getEnsAddress({ name: qualified });
     if (!addr) {
-      return {
-        qualified,
-        tld: "eth",
-        found: false,
-        verified: true,
-        source: "ens-mainnet",
-        records: {},
-      };
+      return { qualified, tld: "eth", found: false, verified: true, source: "ens", records: {} };
     }
-    return {
-      qualified,
-      tld: "eth",
-      found: true,
-      verified: true,
-      source: "ens-mainnet",
-      records: { eth: addr },
-    };
+    return { qualified, tld: "eth", found: true, verified: true, source: "ens", records: { eth: addr } };
   } catch {
-    return {
-      qualified,
-      tld: "eth",
-      found: false,
-      verified: false,
-      source: "ens-mainnet",
-      records: {},
-    };
+    return { qualified, tld: "eth", found: false, verified: false, source: "ens", records: {} };
   }
 }
 
 function resolvePoseidon(label: string, tld: "tact" | "btc"): MultiResolveResult {
   const qualified = `${label}.${tld}`;
   if (!isValidLabel(label)) {
-    return {
-      qualified,
-      tld,
-      found: false,
-      verified: false,
-      source: "poseidon-registry",
-      records: {},
-    };
+    return { qualified, tld, found: false, verified: false, source: "poseidon-registry", records: {} };
   }
-  const reg = getRegistration(normalizeLabel(label), tld);
+  const norm = normalizeLabel(label);
+  const reg = getRegistration(norm, tld === "btc" ? "btc" : "tact");
   if (!reg) {
-    return {
-      qualified,
-      tld,
-      found: false,
-      verified: true,
-      source: "poseidon-registry",
-      records: {},
-    };
+    return { qualified, tld, found: false, verified: true, source: "poseidon-registry", records: {} };
   }
-  const { registration, proof, snapshot } = resolveWithProof(normalizeLabel(label));
-  if (registration && (registration.tld ?? "tact") !== tld) {
-    return {
-      qualified,
-      tld,
-      found: false,
-      verified: true,
-      source: "poseidon-registry",
-      records: {},
-    };
-  }
-  if (!registration) {
-    return {
-      qualified,
-      tld,
-      found: false,
-      verified: true,
-      source: "poseidon-registry",
-      records: {},
-    };
+  const { registration, proof, snapshot } = resolveWithProof(norm);
+  if (!registration || (registration.tld ?? "tact") !== (tld === "btc" ? "btc" : "tact")) {
+    return { qualified, tld, found: false, verified: true, source: "poseidon-registry", records: {} };
   }
   const verified = verifyRegistration(registration, proof, snapshot);
-  const records: ResolvedRecords = {
-    eth: registration.records.eth,
-    btc: registration.records.btc,
-    tacit_shielded: registration.records.tacit_shielded,
-    contenthash: registration.records.contenthash,
-  };
   return {
     qualified,
     tld,
     found: true,
     verified,
     source: "poseidon-registry",
-    records,
+    records: {
+      eth: registration.records.eth,
+      btc: registration.records.btc,
+      tacit_shielded: registration.records.tacit_shielded,
+      contenthash: registration.records.contenthash,
+    },
   };
 }
 
 export async function resolveQualified(
   label: string,
   tld: NameTld,
+  ethNetwork: EthNetwork = "mainnet",
 ): Promise<MultiResolveResult> {
   switch (tld) {
     case "tact":
+      return resolvePoseidon(label, "tact");
     case "btc":
-      return resolvePoseidon(label, tld);
+      return resolvePoseidon(label, "btc");
     case "wei":
-      return resolveWei(label);
+      return resolveWei(label, ethNetwork);
     case "eth":
-      return resolveEns(label);
+      return resolveEns(label, ethNetwork);
     default:
       throw new Error("unknown tld");
   }

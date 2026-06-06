@@ -2,6 +2,9 @@ import { notFound } from "next/navigation";
 import { isValidLabel, normalizeLabel, toDisplayName } from "@/lib/tact-names/normalize";
 import { resolveWithProof } from "@/lib/tact-names/store";
 import { verifyRegistration } from "@/lib/tact-names/verify";
+import { Panel } from "@/components/Panel";
+
+export const dynamic = "force-dynamic";
 
 export default async function NameDetailPage({
   params,
@@ -14,52 +17,42 @@ export default async function NameDetailPage({
 
   const { registration, proof, snapshot, leaf } = resolveWithProof(label);
   const verified =
-    registration && leaf
-      ? verifyRegistration(registration, proof, snapshot)
-      : false;
+    registration && leaf ? verifyRegistration(registration, proof, snapshot) : false;
 
   if (!registration) {
     return (
-      <div className="glass p-8 text-center">
-        <h1 className="font-display text-2xl font-bold">{toDisplayName(label)}</h1>
-        <p className="mt-4 text-white/50">Not registered — claim it on the names page.</p>
-      </div>
+      <Panel>
+        <h1 className="text-xl font-semibold">{toDisplayName(label)}</h1>
+        <p className="mt-3 text-sm text-[var(--pf-muted)]">Not registered.</p>
+      </Panel>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="glass p-8">
+    <div className="space-y-4">
+      <Panel>
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="font-display text-3xl font-bold">{toDisplayName(label)}</h1>
-          <span
-            className={`rounded-full px-3 py-1 text-xs ${verified ? "bg-emerald-500/20 text-emerald-300" : "bg-rose-500/20 text-rose-300"}`}
-          >
-            {verified ? "Merkle verified" : "Unverified"}
+          <h1 className="text-2xl font-semibold">{registration.label}.tact</h1>
+          <span className="border border-[var(--pf-border)] px-2 py-0.5 text-[10px] uppercase">
+            {verified ? "verified" : "unverified"}
           </span>
         </div>
-        <p className="mt-2 font-mono text-sm text-white/40">owner {registration.ownerEth}</p>
-      </div>
-
-      <div className="glass p-6">
-        <h2 className="font-display text-lg font-semibold">Records</h2>
-        <dl className="mt-4 space-y-3 text-sm">
+        <p className="mt-2 font-[family-name:var(--font-mono)] text-xs text-[var(--pf-muted)]">
+          {registration.ownerEth}
+        </p>
+      </Panel>
+      <Panel title="Records">
+        <dl className="space-y-2 text-sm">
           {Object.entries(registration.records).map(([k, v]) =>
             v ? (
-              <div key={k} className="grid gap-1 sm:grid-cols-[140px_1fr]">
-                <dt className="text-white/40">{k}</dt>
-                <dd className="break-all font-mono text-foam">{v}</dd>
+              <div key={k} className="grid gap-1 sm:grid-cols-[120px_1fr]">
+                <dt className="text-[var(--pf-muted)]">{k}</dt>
+                <dd className="break-all font-[family-name:var(--font-mono)] text-xs">{v}</dd>
               </div>
             ) : null,
           )}
         </dl>
-      </div>
-
-      <div className="glass p-6 font-mono text-xs text-white/40">
-        <div>merkle_root: {snapshot.merkleRoot}</div>
-        <div>proof_depth: {proof.length}</div>
-        <div>source: live registry snapshot</div>
-      </div>
+      </Panel>
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 import { quoteRegistration } from "@/lib/names/pricing";
 import { isValidLabel, normalizeLabel } from "@/lib/tact-names/normalize";
 import type { NameTld } from "@/lib/names/tlds";

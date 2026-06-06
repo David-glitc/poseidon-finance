@@ -1,88 +1,106 @@
 "use client";
 
 import { useState } from "react";
-import { resolveTactName } from "@/lib/tact-names/verify";
-import { isValidLabel, normalizeLabel } from "@/lib/tact-names/normalize";
+import { RESOLVE_TLDS, type NameTld } from "@/lib/names/tlds";
+import { useNetworks } from "@/lib/network/context";
+import { Panel } from "@/components/Panel";
 
 export default function SendPage() {
-  const [name, setName] = useState("");
+  const { eth } = useNetworks();
+  const [label, setLabel] = useState("");
+  const [tld, setTld] = useState<NameTld>("tact");
   const [result, setResult] = useState<string | null>(null);
   const [target, setTarget] = useState<{
     eth?: string;
     btc?: string;
     tacit?: string;
   } | null>(null);
+  const [busy, setBusy] = useState(false);
 
   async function resolve() {
-    const label = normalizeLabel(name);
-    if (!isValidLabel(label)) {
-      setResult("Invalid .tact name");
-      return;
+    setBusy(true);
+    setResult(null);
+    setTarget(null);
+    try {
+      const res = await fetch(
+        `/api/names/resolve?label=${encodeURIComponent(label)}&tld=${tld}&ethNetwork=${eth}`,
+      );
+      const data = await res.json();
+      if (!data.found) {
+        setResult(`${label}.${tld} not registered`);
+        return;
+      }
+      setTarget({
+        eth: data.records.eth,
+        btc: data.records.btc,
+        tacit: data.records.tacit_shielded,
+      });
+      setResult(
+        data.verified
+          ? `Resolved via ${data.source} — pick a destination`
+          : `Resolved (${data.source}) — verify before sending`,
+      );
+    } catch {
+      setResult("Lookup failed");
+    } finally {
+      setBusy(false);
     }
-    const res = await resolveTactName(label);
-    if (!res.registration) {
-      setResult("Name not found");
-      setTarget(null);
-      return;
-    }
-    setTarget({
-      eth: res.registration.records.eth,
-      btc: res.registration.records.btc,
-      tacit: res.registration.records.tacit_shielded,
-    });
-    setResult(
-      res.verified
-        ? `Verified (${res.source}) — choose destination below`
-        : `Resolved from ${res.source} — verify before sending`,
-    );
   }
 
   return (
     <div className="mx-auto max-w-lg space-y-6">
       <div>
-        <h1 className="font-display text-3xl font-bold">Send to .tact</h1>
-        <p className="mt-2 text-white/50">
-          Resolve a name to ETH, BTC, or Tacit shielded destination.
+        <h1 className="text-2xl font-semibold tracking-tight">Send by name</h1>
+        <p className="mt-2 text-sm text-[var(--pf-muted)]">
+          Resolve any supported TLD to an ETH, BTC, or Tacit destination. Registration is only for{" "}
+          <strong className="text-[var(--pf-text)]">.tact</strong>.
         </p>
       </div>
-      <div className="glass space-y-4 p-6">
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="recipient.tact"
-          className="w-full rounded-xl border border-white/10 bg-abyss px-4 py-3 text-white"
-        />
-        <button
-          type="button"
-          onClick={resolve}
-          className="w-full rounded-xl bg-coral py-3 text-sm font-semibold text-abyss"
-        >
-          Resolve
+      <Panel>
+        <div className="flex gap-2">
+          <input
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="recipient"
+            className="input flex-1"
+          />
+          <select className="input w-28" value={tld} onChange={(e) => setTld(e.target.value as NameTld)}>
+            {RESOLVE_TLDS.map((t) => (
+              <option key={t.tld} value={t.tld}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button type="button" onClick={resolve} disabled={busy} className="btn-primary mt-4 w-full">
+          {busy ? "Resolving…" : "Resolve"}
         </button>
-        {result && <p className="text-sm text-white/60">{result}</p>}
+        {result && <p className="mt-3 text-sm text-[var(--pf-muted)]">{result}</p>}
         {target && (
-          <div className="space-y-2 text-sm">
+          <div className="mt-4 space-y-2 text-sm">
             {target.tacit && (
               <a
                 href={`https://tacit.finance/?send=${encodeURIComponent(target.tacit)}`}
-                className="block rounded-lg border border-foam/20 p-3 hover:bg-foam/5"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block border border-[var(--pf-border)] p-3 hover:border-[var(--pf-accent)]"
               >
                 Tacit shielded → open tacit.finance
               </a>
             )}
             {target.eth && (
-              <div className="rounded-lg bg-abyss/60 p-3 font-mono text-xs">
-                ETH {target.eth}
+              <div className="border border-[var(--pf-border)] p-3 font-[family-name:var(--font-mono)] text-xs">
+                EVM {target.eth}
               </div>
             )}
             {target.btc && (
-              <div className="rounded-lg bg-abyss/60 p-3 font-mono text-xs">
+              <div className="border border-[var(--pf-border)] p-3 font-[family-name:var(--font-mono)] text-xs">
                 BTC {target.btc}
               </div>
             )}
           </div>
         )}
-      </div>
+      </Panel>
     </div>
   );
 }

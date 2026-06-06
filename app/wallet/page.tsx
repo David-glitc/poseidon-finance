@@ -1,28 +1,25 @@
 import { WalletHub } from "@/components/WalletHub";
-import { GlassCard } from "@/components/GlassCard";
+import { Panel } from "@/components/Panel";
+
+export const dynamic = "force-dynamic";
 
 export default function WalletPage() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <p className="text-xs uppercase tracking-[0.25em] text-sky-400/60">Wallets</p>
-        <h1 className="glow-text mt-2 font-display text-3xl font-bold md:text-4xl">
-          Tri-chain hub
-        </h1>
-        <p className="mt-3 max-w-2xl text-sm text-sky-200/45">
-          Ethereum for .wei / .eth and registration payments, Bitcoin for .btc handles,
-          Tacit for confidential balances and AMM.
+        <h1 className="text-2xl font-semibold tracking-tight">Wallets</h1>
+        <p className="mt-2 text-sm text-[var(--pf-muted)]">
+          ETH for registration and EVM sends. BTC via sats-connect. Tacit key on tacit.finance.
         </p>
       </div>
       <WalletHub />
-      <GlassCard className="p-6 text-sm text-sky-200/50">
-        <h2 className="font-display text-lg font-semibold text-sky-100">Tacit wallet pattern</h2>
-        <p className="mt-2">
-          Poseidon mirrors the tacit.finance dapp: sats-connect for L1 BTC, in-browser Tacit key
-          for shielded UTXOs, worker API for assets/pools, and deep links into the swap tab for
-          proof-backed trades.
-        </p>
-      </GlassCard>
+      <Panel title="How it fits together">
+        <ul className="list-inside list-disc space-y-2 text-sm text-[var(--pf-muted)]">
+          <li>Register .tact with your ETH address</li>
+          <li>Resolve .eth / .wei to pay users on mainnet or sepolia</li>
+          <li>Swap and shielded sends open in the Tacit dApp</li>
+        </ul>
+      </Panel>
     </div>
   );
 }

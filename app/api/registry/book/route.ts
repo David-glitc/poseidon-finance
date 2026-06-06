@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+
+export const dynamic = "force-dynamic";
 import { addBooking, getRegistration, isBooked } from "@/lib/tact-names/store";
 import { isValidLabel, normalizeLabel } from "@/lib/tact-names/normalize";
 import { quoteRegistration } from "@/lib/names/pricing";
@@ -8,7 +10,10 @@ const BOOKING_TTL_MS = 15 * 60 * 1000;
 export async function POST(req: Request) {
   const body = await req.json();
   const label = normalizeLabel(body.label ?? "");
-  const tld = (body.tld === "btc" ? "btc" : "tact") as "tact" | "btc";
+  const tld = "tact" as const;
+  if (body.tld && body.tld !== "tact") {
+    return NextResponse.json({ error: "only .tact registration supported" }, { status: 400 });
+  }
   const ownerEth = String(body.ownerEth ?? "").toLowerCase();
   const ownerBtc = body.ownerBtc ? String(body.ownerBtc) : undefined;
   const sig = String(body.sig ?? "");

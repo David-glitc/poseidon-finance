@@ -1,52 +1,39 @@
 import type { Metadata } from "next";
-import { Inter, Sora } from "next/font/google";
+import { IBM_Plex_Mono, Inter } from "next/font/google";
 import "./globals.css";
 import { Nav } from "@/components/Nav";
-import { OceanBackground } from "@/components/OceanBackground";
+import { NetworkBar } from "@/components/NetworkBar";
 import { WalletProvider } from "@/lib/wallet/provider";
 import { getSiteOrigin, PLANNED_DOMAIN } from "@/lib/config/site";
 
-const display = Sora({
+const body = Inter({ subsets: ["latin"], variable: "--font-body" });
+const mono = IBM_Plex_Mono({
   subsets: ["latin"],
-  variable: "--font-display",
-});
-
-const body = Inter({
-  subsets: ["latin"],
-  variable: "--font-body",
+  weight: ["400", "500"],
+  variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteOrigin()),
-  title: "Poseidon Finance — Tacit DeFi",
-  description:
-    ".tact · .wei · .eth · .btc names, confidential Tacit AMM, BTC + ETH wallets",
-  openGraph: {
-    title: "Poseidon Finance",
-    description: "Liquid glass DeFi on Tacit",
-    siteName: "Poseidon Finance",
-    url: getSiteOrigin(),
-  },
-  alternates: {
-    canonical: getSiteOrigin(),
-  },
-  other: {
-    "planned-domain": PLANNED_DOMAIN,
-  },
+  title: "Poseidon Finance",
+  description: "Tacit DeFi, .tact names, multi-chain resolve for payments",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
-      <body>
-        <OceanBackground />
+    <html lang="en" className={`${body.variable} ${mono.variable}`}>
+      <body className="font-[family-name:var(--font-body)]">
         <WalletProvider>
           <Nav />
-          <main className="relative mx-auto max-w-6xl px-4 py-8">{children}</main>
+          <div className="mx-auto max-w-5xl px-4">
+            <div className="py-3">
+              <NetworkBar />
+            </div>
+            <main className="pb-12">{children}</main>
+            <footer className="border-t border-[var(--pf-border)] py-6 text-xs text-[var(--pf-muted)]">
+              Poseidon Finance · planned domain {PLANNED_DOMAIN}
+            </footer>
+          </div>
         </WalletProvider>
       </body>
     </html>

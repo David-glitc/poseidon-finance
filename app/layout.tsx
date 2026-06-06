@@ -4,6 +4,7 @@ import "./globals.css";
 import { Nav } from "@/components/Nav";
 import { OceanBackground } from "@/components/OceanBackground";
 import { WalletProvider } from "@/lib/wallet/provider";
+import { getSiteOrigin, PLANNED_DOMAIN } from "@/lib/config/site";
 
 const display = Sora({
   subsets: ["latin"],
@@ -16,9 +17,22 @@ const body = Inter({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getSiteOrigin()),
   title: "Poseidon Finance — Tacit DeFi",
   description:
     ".tact · .wei · .eth · .btc names, confidential Tacit AMM, BTC + ETH wallets",
+  openGraph: {
+    title: "Poseidon Finance",
+    description: "Liquid glass DeFi on Tacit",
+    siteName: "Poseidon Finance",
+    url: getSiteOrigin(),
+  },
+  alternates: {
+    canonical: getSiteOrigin(),
+  },
+  other: {
+    "planned-domain": PLANNED_DOMAIN,
+  },
 };
 
 export default function RootLayout({
